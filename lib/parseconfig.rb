@@ -1,9 +1,13 @@
 #
+# 
+# Forked from 
 # Author::      BJ Dierkes <derks@datafolklabs.com>
 # Copyright::   Copyright (c) 2006,2013 BJ Dierkes
 # License::     MIT
 # URL::         https://github.com/datafolklabs/ruby-parseconfig
 #
+# by Richard Acosta at Buffalo Studios 2014
+# blotzy/ruby-parseconfig
 
 # This class was written to simplify the parsing of configuration
 # files in the format of "param = value".  Please review the
@@ -30,8 +34,8 @@ class ParseConfig
   #
   def initialize(config_file=nil)
     @config_file = config_file
-    @params = {}
-    @groups = []
+    @params = {} if @params.nil? # allow for the loading of multiple config files per object
+    @groups = [] if @groups.nil?
 
     if(self.config_file)
       self.validate_config()
@@ -93,6 +97,27 @@ class ParseConfig
         end
       end
     end }
+  end
+
+  # Replace any wildcard strings with other vars from the config file
+  # Only works within the same group or at root level. group takes precedence
+  # raises exception if key is not found in group or root
+  # Wildcard format: ${key}
+  def replace_config_wildcards()
+    self.get_groups().each do |group|
+      @params[group].each do |key,value|
+        value.scan(/\${\w+}/) do |matches|
+          external_key = matches.gsub(/\${(\w+)}/, '\1')
+          replace_with = "@params['#{group}']['#{external_key}']"
+          replace_with = eval("#{replace_with}")
+          replace_with = replace_with.nil? ? @params["#{external_key}"] : replace_with # try looking in root for key
+          if replace_with.nil? then
+            raise "#{external_key} not found"
+          end       
+          @params[group][key] = @params[group][key].gsub(matches, replace_with)
+        end     
+      end   
+    end 
   end
 
   # This method will provide the value held by the object "@param"
