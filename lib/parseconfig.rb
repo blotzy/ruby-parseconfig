@@ -33,14 +33,19 @@ class ParseConfig
   # will eval "@param = value"
   #
   def initialize(config_file=nil)
-    @config_file = config_file
-    @params = {} if @params.nil? # allow for the loading of multiple config files per object
-    @groups = [] if @groups.nil?
+    @params = {}
+    @groups = []
 
-    if(self.config_file)
-      self.validate_config()
-      self.import_config()
+    if(config_file)
+      self.load(config_file)
     end
+  end
+
+  def load(config_file)
+    @config_file = config_file
+    self.validate_config()
+    self.import_config()
+    self.replace_config_wildcards()
   end
 
   # Validate the config file, and contents
@@ -108,11 +113,9 @@ class ParseConfig
       @params[group].each do |key,value|
         value.scan(/\${\w+}/) do |matches|
           external_key = matches.gsub(/\${(\w+)}/, '\1')
-          replace_with = "@params['#{group}']['#{external_key}']"
-          replace_with = eval("#{replace_with}")
-          replace_with = replace_with.nil? ? @params["#{external_key}"] : replace_with # try looking in root for key
+          replace_with = @params[group][external_key].nil? ? @params[external_key] : @params[group][external_key] # try looking in root for key
           if replace_with.nil? then
-            raise "#{external_key} not found"
+            raise "Key: #{external_key} not found"
           end       
           @params[group][key] = @params[group][key].gsub(matches, replace_with)
         end     
